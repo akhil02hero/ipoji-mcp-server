@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+/**
+ * IPO Ji MCP server.
+ *
+ * Gives AI assistants such as Claude tools to look up Indian IPOs:
+ * list IPOs, check an IPO's status and dates, and get allotment info.
+ * The data comes from www.ipoji.com (see ipoji.ts).
+ *
+ * The server talks to the assistant over stdin/stdout (the "stdio" transport):
+ * the assistant starts this program and sends it requests as JSON lines.
+ */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -9,15 +19,22 @@ const server = new McpServer({
   version: "0.1.0",
 });
 
+// Wraps a tool's result as formatted JSON text, the shape MCP expects a tool to return.
 const json = (data: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
 });
 
+// The "which IPO?" input shared by get_ipo_status and get_ipo_allotment.
 const ipoInput = z
   .string()
   .min(2)
   .describe('Company name (e.g. "BLS Polymers") or IPO Ji slug (e.g. "bls-polymers-ipo")');
 
+// Each tool below has a description that the assistant reads to decide when to
+// use it. readOnlyHint says the tool changes nothing; openWorldHint says it
+// reaches out to an outside website.
+
+// list_ipos: IPOs shown on the IPO Ji homepage.
 server.registerTool(
   "list_ipos",
   {
@@ -33,6 +50,7 @@ server.registerTool(
   async ({ status, board }) => json(await listIpos({ status, board })),
 );
 
+// search_ipos: find the right IPO when a company name is ambiguous.
 server.registerTool(
   "search_ipos",
   {
@@ -44,6 +62,7 @@ server.registerTool(
   async ({ query }) => json(await searchIpos(query)),
 );
 
+// get_ipo_status: where an IPO is in its life cycle and its key dates.
 server.registerTool(
   "get_ipo_status",
   {
@@ -68,6 +87,7 @@ server.registerTool(
   },
 );
 
+// get_ipo_allotment: whether allotment is out and where to check your own result.
 server.registerTool(
   "get_ipo_allotment",
   {
@@ -79,6 +99,7 @@ server.registerTool(
   },
   async ({ ipo }) => {
     const d = await getIpoDetails(await resolveSlug(ipo));
+    // Finds a timeline step by the start of its label, e.g. "Allotment" -> "Allotment Date".
     const step = (label: string) => d.timeline.find((s) => s.label.startsWith(label)) ?? null;
     const allotment = step("Allotment");
     return json({
@@ -100,10 +121,12 @@ server.registerTool(
   },
 );
 
+// Starts the server and waits for requests on stdin.
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  // stdout carries the protocol, so log to stderr only.
+  // stdout is reserved for messages to the assistant, so any log
+  // output must go to stderr (console.error), never console.log.
   console.error("ipoji-mcp-server running on stdio");
 }
 
