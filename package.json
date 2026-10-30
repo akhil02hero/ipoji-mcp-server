@@ -1,0 +1,29 @@
+{
+  "name": "ipoji-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for Ipoji",
+  "type": "module",
+  "bin": {
+    "ipoji-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}
